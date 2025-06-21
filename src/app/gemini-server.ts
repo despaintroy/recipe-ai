@@ -1,16 +1,20 @@
 'use server';
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 export async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Missing Gemini API key');
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    systemInstruction:
-      'You are a helpful assistant. Respond in plain text. No markdown.',
+  const genAI = new GoogleGenAI({ apiKey });
+  const response = await genAI.models.generateContent({
+    model: 'gemini-2.0-flash-001',
+    contents: prompt,
+    config: {
+      systemInstruction:
+        'You are a helpful assistant that responds to one question at a time. ' +
+        'Do not ask follow-up questions. ' +
+        'Respond in plain text without any markdown formatting. ',
+    },
   });
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return response.text ?? 'No response';
 }
