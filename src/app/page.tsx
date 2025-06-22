@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import clsx from 'clsx';
 import { fetchRecipeContent } from '@/app/recipeFetcher';
+import { summarizeRecipe } from '@/app/recipeSummarizer';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -12,9 +13,15 @@ export default function Home() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setOutput('');
     try {
       const text = await fetchRecipeContent(url);
-      setOutput(text ?? 'Failed to fetch recipe content');
+      if (!text) {
+        setOutput('Failed to fetch recipe content.');
+        return;
+      }
+      const summary = await summarizeRecipe(text);
+      setOutput(summary || 'Failed to summarize the recipe.');
     } catch (e) {
       console.error(e);
       setOutput('An error occurred while fetching the recipe content.');
@@ -26,12 +33,9 @@ export default function Home() {
   const readyToSubmit = !loading && url.trim().length > 0;
 
   return (
-    <div className="my-10">
+    <div className="my-10 max-w-2xl mx-auto">
       <h1 className="text-6xl text-center font-bold mb-5">Gemini Demo</h1>
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-col items-center gap-4 max-w-xl mx-auto"
-      >
+      <form onSubmit={onSubmit} className="flex flex-col items-center gap-4">
         <input
           type="text"
           className="w-full px-4 py-2 border rounded"
@@ -51,8 +55,16 @@ export default function Home() {
         >
           {loading ? 'Loading...' : 'Get Recipe'}
         </button>
-        {output ? <div className="whitespace-pre-line">{output}</div> : null}
       </form>
+      {output ? (
+        <>
+          <hr className="my-10" />
+          <div
+            className="styled-html"
+            dangerouslySetInnerHTML={{ __html: output }}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
