@@ -1,31 +1,29 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { callGemini } from '@/app/gemini-server';
 import clsx from 'clsx';
+import { fetchRecipeContent } from '@/app/recipeFetcher';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [question, setQuestion] = useState('');
-  const [response, setResponse] = useState<string | null>(null);
+  const [url, setUrl] = useState('');
+  const [output, setOutput] = useState('');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setResponse(null);
     try {
-      const data = await callGemini(question);
-      setResponse(data);
+      const text = await fetchRecipeContent(url);
+      setOutput(text ?? 'Failed to fetch recipe content');
     } catch (e) {
-      setResponse(
-        'Error: ' + (e instanceof Error ? e.message : 'Unknown error'),
-      );
+      console.error(e);
+      setOutput('An error occurred while fetching the recipe content.');
     } finally {
       setLoading(false);
     }
   }
 
-  const readyToSubmit = !loading && question.trim().length > 0;
+  const readyToSubmit = !loading && url.trim().length > 0;
 
   return (
     <div className="my-10">
@@ -37,9 +35,9 @@ export default function Home() {
         <input
           type="text"
           className="w-full px-4 py-2 border rounded"
-          placeholder="Ask Gemini a question..."
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Enter a recipe URL..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
           disabled={loading}
           required
         />
@@ -51,15 +49,10 @@ export default function Home() {
           )}
           disabled={!readyToSubmit}
         >
-          {loading ? 'Loading...' : 'Ask Gemini'}
+          {loading ? 'Loading...' : 'Get Recipe'}
         </button>
+        {output ? <div className="whitespace-pre-line">{output}</div> : null}
       </form>
-      {response && (
-        <div className="mt-8 max-w-xl mx-auto p-4 bg-stone-900 rounded">
-          <h2 className="font-semibold mb-2">Gemini says:</h2>
-          <div className="whitespace-pre-line">{response}</div>
-        </div>
-      )}
     </div>
   );
 }
