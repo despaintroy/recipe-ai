@@ -1,24 +1,128 @@
 'use server';
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Schema as GenAISchema, Type } from '@google/genai';
+import { z } from 'zod';
 
-export async function summarizeRecipe(recipe: string): Promise<string | null> {
+const zodRecipeSchema = z.object({
+  title: z.string(),
+  ingredients: z.array(
+    z.object({
+      name: z.string(),
+      measurement: z.string().optional(),
+    }),
+  ),
+  steps: z.array(
+    z.object({
+      heading: z.string(),
+      ingredients: z.array(
+        z.object({
+          name: z.string(),
+          measurement: z.string().optional(),
+        }),
+      ),
+      instructions: z.string(),
+    }),
+  ),
+  tips: z.array(z.string()),
+});
+
+export type Recipe = z.infer<typeof zodRecipeSchema>;
+
+const responseSchema: GenAISchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: {
+      type: Type.STRING,
+    },
+    ingredients: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: {
+            type: Type.STRING,
+          },
+          measurement: {
+            type: Type.STRING,
+          },
+        },
+        required: ['name'],
+      },
+    },
+    steps: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          heading: {
+            type: Type.STRING,
+          },
+          ingredients: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: {
+                  type: Type.STRING,
+                },
+                measurement: {
+                  type: Type.STRING,
+                },
+              },
+              required: ['name'],
+            },
+          },
+          instructions: {
+            type: Type.STRING,
+          },
+        },
+        required: ['heading', 'ingredients', 'instructions'],
+      },
+    },
+    tips: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.STRING,
+      },
+    },
+  },
+  required: ['title', 'ingredients', 'steps', 'tips'],
+};
+
+export async function summarizeRecipe(recipe: string): Promise<Recipe | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Missing Gemini API key');
   const genAI = new GoogleGenAI({ apiKey });
   const response = await genAI.models.generateContent({
-    model: 'gemini-2.0-flash-001',
+    model: 'gemini-2.0-flash',
     contents: recipe,
     config: {
+      temperature: 1,
+      responseSchema,
+      responseMimeType: 'application/json',
       systemInstruction:
-        'You will be provided the text content of a recipe web page. ' +
-        'Your task if to provide (1) a title, (2) a list of ingredients, (3) a list of steps, and (4) a summary of other helpful tips from the page. ' +
+        'Your task is to summarize the provided recipe web page into a structured format. ' +
+        'The output should be a JSON object with the following fields: title, ingredients, steps, and tips. ' +
+        'The title should be a short, descriptive name for the recipe. ' +
+        'The ingredients should be a list of objects, each with a name and an optional measurement (e.g., "6 cups", "2 tbsp"). ' +
+        'If a measurement does not make sense for an ingredient (such as "syrup" for topping, or "salt" to taste), omit the measurement field for that ingredient. ' +
+        'The steps should be a list of objects, each with a heading, a list of ingredients needed for that step (each with a name and optional measurement), and instructions. ' +
+        'The tips should be a list of helpful tips related to cooking the recipe. ' +
         'All ingredients should be in US customary units. Never metric. ' +
-        'Each step should have a heading, list of ingredients for that step including measurements, and the step instructions. ' +
-        'The helpful tips should all relate to cooking the recipe and not useless storytelling from the author. ' +
-        'The output should be HTML ready to be directly inserted into the body tag. You may use the following tags: <h1>, <h2>, <h3>, <p>, <ul>, <ol>, <li>, <b>. ' +
-        'Return only HTML body content. Do not include "```html" wrapper, or the tags <html>, <head>, or <body>. ',
+        'The helpful tips should all relate to cooking the recipe and not useless storytelling from the author. ',
     },
   });
-  return response.text || null;
+
+  if (!response || !response.text) {
+    console.error('No response from Gemini API');
+    return null;
+  }
+  try {
+    console.log(response.text);
+    const parsedJSON = JSON.parse(response.text);
+    return zodRecipeSchema.parse(parsedJSON);
+  } catch (error) {
+    console.error('Error parsing response:', error);
+    return null;
+  }
 }

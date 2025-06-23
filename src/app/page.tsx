@@ -3,28 +3,29 @@
 import { FormEvent, useState } from 'react';
 import clsx from 'clsx';
 import { fetchRecipeContent } from '@/app/recipeFetcher';
-import { summarizeRecipe } from '@/app/recipeSummarizer';
+import { Recipe, summarizeRecipe } from '@/app/recipeSummarizer';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [url, setUrl] = useState('');
-  const [output, setOutput] = useState('');
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setOutput('');
+    setRecipe(null);
     try {
-      const text = await fetchRecipeContent(url);
-      if (!text) {
-        setOutput('Failed to fetch recipe content.');
+      const recipeText = await fetchRecipeContent(url);
+      if (!recipeText) {
+        setRecipe(null);
         return;
       }
-      const summary = await summarizeRecipe(text);
-      setOutput(summary || 'Failed to summarize the recipe.');
+      const recipe = await summarizeRecipe(recipeText);
+      console.log({ recipe });
+      setRecipe(recipe);
     } catch (e) {
       console.error(e);
-      setOutput('An error occurred while fetching the recipe content.');
+      setRecipe(null);
     } finally {
       setLoading(false);
     }
@@ -33,8 +34,7 @@ export default function Home() {
   const readyToSubmit = !loading && url.trim().length > 0;
 
   return (
-    <div className="my-10 max-w-2xl mx-auto">
-      <h1 className="text-6xl text-center font-bold mb-5">Gemini Demo</h1>
+    <div className="my-10 max-w-2xl mx-auto px-4">
       <form onSubmit={onSubmit} className="flex flex-col items-center gap-4">
         <input
           type="text"
@@ -56,13 +56,53 @@ export default function Home() {
           {loading ? 'Loading...' : 'Get Recipe'}
         </button>
       </form>
-      {output ? (
+      {recipe ? (
         <>
           <hr className="my-10" />
-          <div
-            className="styled-html"
-            dangerouslySetInnerHTML={{ __html: output }}
-          />
+          <div>
+            <h2 className="text-3xl font-bold mb-4">{recipe.title}</h2>
+            <h3 className="text-xl font-semibold mt-6 mb-2">Ingredients</h3>
+            <ul className="list-disc list-inside ml-4 mb-6">
+              {recipe.ingredients.map((ing, i) => (
+                <li key={i}>
+                  {ing.measurement ? `${ing.measurement} ` : ''}
+                  {ing.name}
+                </li>
+              ))}
+            </ul>
+            <h3 className="text-xl font-semibold mt-6 mb-2">Steps</h3>
+            <div className="flex flex-col gap-6">
+              {recipe.steps.map((step, i) => (
+                <div key={i}>
+                  <p className="text-lg font-bold">{step.heading}</p>
+                  {step.ingredients.length ? (
+                    <div className="mb-1">
+                      <span className="font-medium">Ingredients:</span>
+                      <ul className="list-disc list-inside ml-4">
+                        {step.ingredients.map((ing, j) => (
+                          <li key={j}>
+                            {ing.measurement ? `${ing.measurement} ` : ''}
+                            {ing.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="">{step.instructions}</div>
+                </div>
+              ))}
+            </div>
+            {recipe.tips && recipe.tips.length > 0 && (
+              <>
+                <h3 className="text-xl font-semibold mt-6 mb-2">Tips</h3>
+                <ul className="list-disc list-inside">
+                  {recipe.tips.map((tip: string, i) => (
+                    <li key={i}>{tip}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         </>
       ) : null}
     </div>
