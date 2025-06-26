@@ -39,7 +39,7 @@ export default function Home() {
         <input
           type="text"
           className="w-full px-4 py-2 border rounded"
-          placeholder="Enter a recipe URL..."
+          placeholder="Enter link to recipe..."
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           disabled={loading}
@@ -53,48 +53,42 @@ export default function Home() {
           )}
           disabled={!readyToSubmit}
         >
-          {loading ? 'Loading...' : 'Get Recipe'}
+          {loading ? 'Loading...' : 'Summarize Recipe'}
         </button>
       </form>
       {recipe ? (
         <>
           <hr className="my-10" />
           <div>
-            <h2 className="text-3xl font-bold mb-4">{recipe.title}</h2>
-            <h3 className="text-xl font-semibold mt-6 mb-2">Ingredients</h3>
+            <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
+
+            <h2 className="text-xl font-semibold mt-6 mb-2">Ingredients:</h2>
             <ul className="list-disc list-inside ml-4 mb-6">
-              {recipe.ingredients.map((ing, i) => (
-                <li key={i}>
-                  {ing.measurement ? `${ing.measurement} ` : ''}
-                  {ing.name}
-                </li>
+              {recipe.ingredients.map((ingredient, i) => (
+                <li key={i}>{ingredient}</li>
               ))}
             </ul>
-            <h3 className="text-xl font-semibold mt-6 mb-2">Steps</h3>
-            <div className="flex flex-col gap-6">
-              {recipe.steps.map((step, i) => (
-                <div key={i}>
-                  <p className="text-lg font-bold">{step.heading}</p>
-                  {step.ingredients.length ? (
-                    <div className="mb-1">
-                      <span className="font-medium">Ingredients:</span>
-                      <ul className="list-disc list-inside ml-4">
-                        {step.ingredients.map((ing, j) => (
-                          <li key={j}>
-                            {ing.measurement ? `${ing.measurement} ` : ''}
-                            {ing.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  <div className="">{step.instructions}</div>
-                </div>
-              ))}
-            </div>
-            {recipe.tips && recipe.tips.length > 0 && (
+
+            {recipe.steps.map((step, stepIndex) => (
+              <div key={stepIndex}>
+                <h2 className="text-xl font-semibold mt-6 mb-2">
+                  {stepIndex + 1}. {step.heading}
+                </h2>
+                {step.ingredients?.length ? (
+                  <ul className="list-disc list-inside ml-4 mb-2">
+                    {step.ingredients.map((ingredient, ingredientIndex) => (
+                      <li key={ingredientIndex}>{ingredient}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p>{step.instructions}</p>
+              </div>
+            ))}
+
+            {!!recipe.tips.length && (
               <>
-                <h3 className="text-xl font-semibold mt-6 mb-2">Tips</h3>
+                <hr className="my-8" />
+                <h2 className="text-xl font-semibold mt-6 mb-2">Tips</h2>
                 <ul className="list-disc list-inside">
                   {recipe.tips.map((tip: string, i) => (
                     <li key={i}>{tip}</li>

@@ -5,21 +5,11 @@ import { z } from 'zod';
 
 const zodRecipeSchema = z.object({
   title: z.string(),
-  ingredients: z.array(
-    z.object({
-      name: z.string(),
-      measurement: z.string().optional(),
-    }),
-  ),
+  ingredients: z.array(z.string()),
   steps: z.array(
     z.object({
       heading: z.string(),
-      ingredients: z.array(
-        z.object({
-          name: z.string(),
-          measurement: z.string().optional(),
-        }),
-      ),
+      ingredients: z.array(z.string()).optional(),
       instructions: z.string(),
     }),
   ),
@@ -37,16 +27,7 @@ const responseSchema: GenAISchema = {
     ingredients: {
       type: Type.ARRAY,
       items: {
-        type: Type.OBJECT,
-        properties: {
-          name: {
-            type: Type.STRING,
-          },
-          measurement: {
-            type: Type.STRING,
-          },
-        },
-        required: ['name'],
+        type: Type.STRING,
       },
     },
     steps: {
@@ -60,23 +41,14 @@ const responseSchema: GenAISchema = {
           ingredients: {
             type: Type.ARRAY,
             items: {
-              type: Type.OBJECT,
-              properties: {
-                name: {
-                  type: Type.STRING,
-                },
-                measurement: {
-                  type: Type.STRING,
-                },
-              },
-              required: ['name'],
+              type: Type.STRING,
             },
           },
           instructions: {
             type: Type.STRING,
           },
         },
-        required: ['heading', 'ingredients', 'instructions'],
+        required: ['heading', 'instructions'],
       },
     },
     tips: {
@@ -102,13 +74,16 @@ export async function summarizeRecipe(recipe: string): Promise<Recipe | null> {
       responseMimeType: 'application/json',
       systemInstruction:
         'Your task is to summarize the provided recipe web page into a structured format. ' +
+        'Rewrite instructions as simply as possible with a very professional style as instructions to the user. Do not include any superfluous phrases or storytelling from the provided page. ' +
         'The output should be a JSON object with the following fields: title, ingredients, steps, and tips. ' +
         'The title should be a short, descriptive name for the recipe. ' +
-        'The ingredients should be a list of objects, each with a name and an optional measurement (e.g., "6 cups", "2 tbsp"). ' +
-        'If a measurement does not make sense for an ingredient (such as "syrup" for topping, or "salt" to taste), omit the measurement field for that ingredient. ' +
-        'The steps should be a list of objects, each with a heading, a list of ingredients needed for that step (each with a name and optional measurement), and instructions. ' +
+        'Each ingredient should specify a measurement if present (e.g., "6 cups flour", "2 tbsp sugar", "Pinch of salt"). ' +
+        'Abbreviate measurements (e.g., "tbsp" for tablespoon, "tsp" for teaspoon). ' +
+        'Measurements should be stated only in US customary units. ' +
+        'The steps should be a list of objects, each with a heading describing the step, a list of ingredients needed for that step, and instructions. ' +
+        'Only list ingredients for a step if it requires adding new ingredients, not using mixtures from previous steps. ' +
+        'Split up steps as needed to ensure only one type of task happens in each step (e.g. dry ingredients, wet ingredients, roll, bake). ' +
         'The tips should be a list of helpful tips related to cooking the recipe. ' +
-        'All ingredients should be in US customary units. Never metric. ' +
         'The helpful tips should all relate to cooking the recipe and not useless storytelling from the author. ',
     },
   });
@@ -118,7 +93,6 @@ export async function summarizeRecipe(recipe: string): Promise<Recipe | null> {
     return null;
   }
   try {
-    console.log(response.text);
     const parsedJSON = JSON.parse(response.text);
     return zodRecipeSchema.parse(parsedJSON);
   } catch (error) {
