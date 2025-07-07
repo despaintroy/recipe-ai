@@ -1,11 +1,40 @@
 'use client';
 
-import { FormEvent, useReducer } from 'react';
+import { FormEvent, useEffect, useReducer } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchRecipeContent } from '@/app/recipeFetcher';
 import { Recipe, summarizeRecipe } from '@/app/recipeSummarizer';
 
 export default function Home() {
   const [state, dispatch] = useReducer(recipeReducer, { status: 'idle' });
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  async function fetchAndSummarize(url: string) {
+    dispatch({ type: 'startSummarizing' });
+    try {
+      const recipeText = await fetchRecipeContent(url);
+      const recipe = await summarizeRecipe(recipeText);
+      dispatch({ type: 'summarizeSuccess', recipe });
+    } catch {
+      dispatch({
+        type: 'summarizeError',
+        error: 'Failed to summarize the recipe from the provided URL',
+      });
+    }
+  }
+
+  useEffect(() => {
+    const recipeUrl = searchParams.get('recipe');
+    if (recipeUrl) {
+      // Remove the ?recipe= param from the URL
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.delete('recipe');
+      router.replace('?' + params.toString(), { scroll: false });
+      // Trigger submit logic
+      fetchAndSummarize(recipeUrl);
+    }
+  }, [searchParams, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -18,18 +47,7 @@ export default function Home() {
       });
       return;
     }
-
-    dispatch({ type: 'startSummarizing' });
-    try {
-      const recipeText = await fetchRecipeContent(url);
-      const recipe = await summarizeRecipe(recipeText);
-      dispatch({ type: 'summarizeSuccess', recipe });
-    } catch {
-      dispatch({
-        type: 'summarizeError',
-        error: 'Failed to summarize the recipe from the provided URL',
-      });
-    }
+    fetchAndSummarize(url);
   }
 
   if (state.status === 'idle') {
