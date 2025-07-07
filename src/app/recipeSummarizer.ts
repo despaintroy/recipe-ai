@@ -61,7 +61,7 @@ const responseSchema: GenAISchema = {
   required: ['title', 'ingredients', 'steps', 'tips'],
 };
 
-export async function summarizeRecipe(recipe: string): Promise<Recipe | null> {
+export async function summarizeRecipe(recipe: string): Promise<Recipe> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Missing Gemini API key');
   const genAI = new GoogleGenAI({ apiKey });
@@ -90,13 +90,13 @@ export async function summarizeRecipe(recipe: string): Promise<Recipe | null> {
 
   if (!response || !response.text) {
     console.error('No response from Gemini API');
-    return null;
+    throw new Error('No response from Gemini API');
   }
   try {
     const parsedJSON = JSON.parse(response.text);
     return zodRecipeSchema.parse(parsedJSON);
   } catch (error) {
     console.error('Error parsing response:', error);
-    return null;
+    throw new Error('Failed to parse recipe response');
   }
 }

@@ -19,7 +19,7 @@ const removeUselessTags = (root: HTMLElement) => {
   });
 };
 
-export async function fetchRecipeContent(url: string): Promise<string | null> {
+export async function fetchRecipeContent(url: string): Promise<string> {
   try {
     const page = await axios.get(url);
     const root = parse(page.data);
@@ -28,6 +28,6 @@ export async function fetchRecipeContent(url: string): Promise<string | null> {
     return parsedAgain.structuredText.replaceAll('<!DOCTYPE html>', '').trim();
   } catch (error) {
     console.error('Error fetching recipe content:', error);
-    return null;
+    throw new Error('Failed to fetch recipe content from the provided URL');
   }
 }

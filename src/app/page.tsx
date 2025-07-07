@@ -1,104 +1,150 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import clsx from 'clsx';
+import { FormEvent, useReducer } from 'react';
 import { fetchRecipeContent } from '@/app/recipeFetcher';
 import { Recipe, summarizeRecipe } from '@/app/recipeSummarizer';
 
 export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [url, setUrl] = useState('');
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [state, dispatch] = useReducer(recipeReducer, { status: 'idle' });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setRecipe(null);
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const url = formData.get('url') as string;
+    if (!url) {
+      dispatch({
+        type: 'summarizeError',
+        error: 'Please provide a valid URL',
+      });
+      return;
+    }
+
+    dispatch({ type: 'startSummarizing' });
     try {
       const recipeText = await fetchRecipeContent(url);
-      if (!recipeText) {
-        setRecipe(null);
-        return;
-      }
       const recipe = await summarizeRecipe(recipeText);
-      console.log({ recipe });
-      setRecipe(recipe);
-    } catch (e) {
-      console.error(e);
-      setRecipe(null);
-    } finally {
-      setLoading(false);
+      dispatch({ type: 'summarizeSuccess', recipe });
+    } catch {
+      dispatch({
+        type: 'summarizeError',
+        error: 'Failed to summarize the recipe from the provided URL',
+      });
     }
   }
 
-  const readyToSubmit = !loading && url.trim().length > 0;
-
-  return (
-    <div className="my-10 max-w-2xl mx-auto px-4">
+  if (state.status === 'idle') {
+    return (
       <form onSubmit={onSubmit} className="flex flex-col items-center gap-4">
         <input
           type="text"
           className="w-full px-4 py-2 border rounded"
           placeholder="Enter link to recipe..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          disabled={loading}
+          name="url"
           required
         />
         <button
           type="submit"
-          className={clsx(
-            'px-6 py-2 bg-blue-900 text-white rounded disabled:opacity-50',
-            readyToSubmit && 'hover:bg-blue-800 cursor-pointer',
-          )}
-          disabled={!readyToSubmit}
+          className="px-6 py-2 bg-stone-800 text-stone-300 rounded cursor-pointer hover:bg-stone-700"
         >
-          {loading ? 'Loading...' : 'Summarize Recipe'}
+          Summarize Recipe &rarr;
         </button>
       </form>
-      {recipe ? (
-        <>
-          <hr className="my-10" />
-          <div>
-            <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
+    );
+  }
 
-            <h2 className="text-xl font-semibold mt-6 mb-2">Ingredients:</h2>
-            <ul className="list-disc list-inside ml-4 mb-6">
-              {recipe.ingredients.map((ingredient, i) => (
-                <li key={i}>{ingredient}</li>
+  if (state.status === 'summarizing') {
+    return <p className="text-center">Summarizing recipe...</p>;
+  }
+
+  if (state.status === 'error') {
+    return (
+      <div className="text-red-300 text-center">
+        <p className="mb-4">{state.error}</p>
+        <button
+          onClick={() => dispatch({ type: 'reset' })}
+          className="px-6 py-2 bg-stone-800 text-stone-300 rounded cursor-pointer hover:bg-stone-700"
+        >
+          Try a Different URL
+        </button>
+      </div>
+    );
+  }
+
+  const { title, ingredients, steps, tips } = state.recipe;
+
+  return (
+    <>
+      <div>
+        <button
+          onClick={() => dispatch({ type: 'reset' })}
+          className="mb-4 px-4 py-1 bg-stone-800 text-stone-300 rounded cursor-pointer hover:bg-stone-700"
+        >
+          &larr; Try Another Recipe
+        </button>
+        <h1 className="text-3xl font-bold mb-4">{title}</h1>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">Ingredients:</h2>
+        <ul className="list-disc list-inside ml-4 mb-6">
+          {ingredients.map((ingredient, i) => (
+            <li key={i}>{ingredient}</li>
+          ))}
+        </ul>
+
+        {steps.map((step, stepIndex) => (
+          <div key={stepIndex}>
+            <h2 className="text-xl font-semibold mt-6 mb-2">
+              {stepIndex + 1}. {step.heading}
+            </h2>
+            {step.ingredients?.length ? (
+              <ul className="list-disc list-inside ml-4 mb-2">
+                {step.ingredients.map((ingredient, ingredientIndex) => (
+                  <li key={ingredientIndex}>{ingredient}</li>
+                ))}
+              </ul>
+            ) : null}
+            <p>{step.instructions}</p>
+          </div>
+        ))}
+
+        {!!tips.length && (
+          <>
+            <hr className="my-8" />
+            <h2 className="text-xl font-semibold mt-6 mb-2">Tips</h2>
+            <ul className="list-disc list-inside">
+              {tips.map((tip: string, i: number) => (
+                <li key={i}>{tip}</li>
               ))}
             </ul>
-
-            {recipe.steps.map((step, stepIndex) => (
-              <div key={stepIndex}>
-                <h2 className="text-xl font-semibold mt-6 mb-2">
-                  {stepIndex + 1}. {step.heading}
-                </h2>
-                {step.ingredients?.length ? (
-                  <ul className="list-disc list-inside ml-4 mb-2">
-                    {step.ingredients.map((ingredient, ingredientIndex) => (
-                      <li key={ingredientIndex}>{ingredient}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                <p>{step.instructions}</p>
-              </div>
-            ))}
-
-            {!!recipe.tips.length && (
-              <>
-                <hr className="my-8" />
-                <h2 className="text-xl font-semibold mt-6 mb-2">Tips</h2>
-                <ul className="list-disc list-inside">
-                  {recipe.tips.map((tip: string, i) => (
-                    <li key={i}>{tip}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-        </>
-      ) : null}
-    </div>
+          </>
+        )}
+      </div>
+    </>
   );
+}
+
+type RecipeState =
+  | { status: 'idle' }
+  | { status: 'summarizing' }
+  | { status: 'success'; recipe: Recipe }
+  | { status: 'error'; error: string };
+
+type RecipeAction =
+  | { type: 'startSummarizing' }
+  | { type: 'summarizeSuccess'; recipe: Recipe }
+  | { type: 'summarizeError'; error: string }
+  | { type: 'reset' };
+
+function recipeReducer(state: RecipeState, action: RecipeAction): RecipeState {
+  switch (action.type) {
+    case 'startSummarizing':
+      return { status: 'summarizing' };
+    case 'summarizeSuccess':
+      return { status: 'success', recipe: action.recipe };
+    case 'summarizeError':
+      return { status: 'error', error: action.error };
+    case 'reset':
+      return { status: 'idle' };
+    default:
+      return state;
+  }
 }
